@@ -1,4 +1,3 @@
-use anyhow::Result;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{metrics::SdkMeterProvider, trace::SdkTracerProvider};
@@ -35,7 +34,6 @@ pub struct TelemetryProviders {
     pub meter_provider: Option<SdkMeterProvider>,
     pub tracer_provider: Option<SdkTracerProvider>,
 }
-
 
 impl Drop for TelemetryProviders {
     fn drop(&mut self) {
@@ -91,15 +89,15 @@ impl TelemetryBuilder {
         self
     }
 
-    pub fn build(self) -> anyhow::Result<TelemetryProviders> {
+    pub fn build(self) -> Result<TelemetryProviders, TelemetryError> {
         let logging_layer = build_logging_layer()?;
-
+        let service_name = self.config.service_name.clone();
         let mut layers: Vec<Box<dyn Layer<Registry> + Send + Sync>> = vec![logging_layer];
         let mut providers = TelemetryProviders::default();
 
         match self.config.metrics_endpoint {
             Some(endpoint) => {
-                let provider = build_meter_provider(endpoint)?;
+                let provider = build_meter_provider(endpoint, service_name.clone())?;
                 providers.meter_provider = Some(provider.clone());
                 layers.push(build_metrics_exporter(provider)?);
             }
@@ -110,9 +108,9 @@ impl TelemetryBuilder {
 
         match self.config.tracing_endpoint {
             Some(endpoint) => {
-                let provider = build_tracer_provider(endpoint)?;
+                let provider = build_tracer_provider(endpoint, service_name.clone())?;
                 providers.tracer_provider = Some(provider.clone());
-                layers.push(build_tracing_exporter(provider)?);
+                layers.push(build_tracing_exporter(provider, service_name.clone())?);
             }
             None => {
                 tracing::warn!("No tracer endpoint configured, traces will not be exported.");
@@ -125,7 +123,7 @@ impl TelemetryBuilder {
     }
 }
 
-fn build_logging_layer() -> Result<Box<dyn Layer<Registry> + Send + Sync>> {
+fn build_logging_layer() -> Result<Box<dyn Layer<Registry> + Send + Sync>, TelemetryError> {
     let env_log_level = std::env::var("LOG_LEVEL")
         .unwrap_or("info".to_string())
         .parse()
@@ -140,7 +138,10 @@ fn build_logging_layer() -> Result<Box<dyn Layer<Registry> + Send + Sync>> {
         .boxed())
 }
 
-fn build_meter_provider(endpoint: String) -> Result<SdkMeterProvider> {
+fn build_meter_provider(
+    endpoint: String,
+    service_name: String,
+) -> Result<SdkMeterProvider, TelemetryError> {
     let metrics_exporter = opentelemetry_otlp::MetricExporter::builder()
         .with_http()
         .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
@@ -152,7 +153,7 @@ fn build_meter_provider(endpoint: String) -> Result<SdkMeterProvider> {
         .with_periodic_exporter(metrics_exporter)
         .with_resource(
             opentelemetry_sdk::Resource::builder()
-                .with_service_name("blog")
+                .with_service_name(service_name)
                 .build(),
         )
         .build();
@@ -162,23 +163,26 @@ fn build_meter_provider(endpoint: String) -> Result<SdkMeterProvider> {
 
 fn build_metrics_exporter(
     meter_provider: SdkMeterProvider,
-) -> Result<Box<dyn Layer<Registry> + Send + Sync>> {
+) -> Result<Box<dyn Layer<Registry> + Send + Sync>, TelemetryError> {
     Ok(MetricsLayer::new(meter_provider).boxed())
 }
 
-fn build_tracer_provider(endpoint: String) -> Result<SdkTracerProvider> {
+fn build_tracer_provider(
+    endpoint: String,
+    service_name: String,
+) -> Result<SdkTracerProvider, TelemetryError> {
     let exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_http()
         .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
         .with_endpoint(endpoint)
         .build()
-        .expect("Failed to create span exporter");
+        .map_err(TelemetryError::MetricExporter)?;
 
     Ok(SdkTracerProvider::builder()
         .with_batch_exporter(exporter)
         .with_resource(
             opentelemetry_sdk::Resource::builder()
-                .with_service_name("blog")
+                .with_service_name(service_name)
                 .build(),
         )
         .build())
@@ -186,8 +190,9 @@ fn build_tracer_provider(endpoint: String) -> Result<SdkTracerProvider> {
 
 fn build_tracing_exporter(
     tracer_provider: SdkTracerProvider,
-) -> Result<Box<dyn Layer<Registry> + Send + Sync>> {
+    service_name: String,
+) -> Result<Box<dyn Layer<Registry> + Send + Sync>, TelemetryError> {
     Ok(tracing_opentelemetry::layer()
-        .with_tracer(tracer_provider.tracer(""))
+        .with_tracer(tracer_provider.tracer(service_name))
         .boxed())
 }
