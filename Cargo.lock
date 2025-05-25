@@ -767,7 +767,6 @@ dependencies = [
 name = "rust-web-common"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
