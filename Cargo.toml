@@ -5,8 +5,8 @@ edition = "2024"
 
 [dependencies]
 anyhow = { version = "1.0.98" }
-opentelemetry = { version = "0.30.0" }
-opentelemetry-otlp = { version = "0.30.0" }
+opentelemetry = { version = "0.29.1" }
+opentelemetry-otlp = { version = "0.29.0" }
 opentelemetry_sdk = { version = "0.29.0" }
 thiserror = { version = "2.0.12" }
 tracing = { version = "0.1.41" }
