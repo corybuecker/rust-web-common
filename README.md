@@ -43,6 +43,10 @@ fn main() {
 
 This library is designed to centralize the configuration of telemetry (logging, metrics, and tracing) for Rust-based web services, ensuring consistent observability practices and reducing duplicated setup code across projects.
 
+## Notes
+
+- This README was written by AI.
+
 ## License
 
 MIT
