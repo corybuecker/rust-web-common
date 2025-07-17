@@ -12,17 +12,17 @@
 
 The following environment variables are used to configure the library at runtime:
 
-- **`LOG_LEVEL`**  
-  Sets the logging verbosity.  
-  Example values: `info`, `debug`, `warn`, `error`  
+- **`LOG_LEVEL`**
+  Sets the logging verbosity.
+  Example values: `info`, `debug`, `warn`, `error`
   _Default_: `info`
 
-- **`METRICS_ENDPOINT`**  
-  The URL or address to which metrics are exported.  
+- **`METRICS_ENDPOINT`**
+  The URL or address to which metrics are exported.
   If not set, metrics exporting will be disabled.
 
-- **`TRACING_ENDPOINT`**  
-  The URL or address to which traces are exported.  
+- **`TRACING_ENDPOINT`**
+  The URL or address to which traces are exported.
   If not set, tracing exporting will be disabled.
 
 ## Example Usage
@@ -32,9 +32,17 @@ use rust_web_common::telemetry::TelemetryBuilder;
 
 fn main() {
     // Reads endpoints and log level from environment variables
-    let _telemetry = TelemetryBuilder::new("my-service")
-        .build()
-        .expect("Failed to initialize telemetry");
+    let mut telemetry = TelemetryBuilder::new("blog".to_string());
+    telemetry
+        .init_subscriber()
+        .expect("could not initialize subscriber");
+    telemetry
+        .init_tracing()
+        .expect("could not initialize tracing");
+    telemetry
+        .init_metering()
+        .expect("could not initialize metering");
+
     // Your application logic here
 }
 ```
@@ -43,10 +51,10 @@ fn main() {
 
 This library is designed to centralize the configuration of telemetry (logging, metrics, and tracing) for Rust-based web services, ensuring consistent observability practices and reducing duplicated setup code across projects.
 
-## Notes
-
-- This README was written by AI.
-
 ## License
 
 MIT
+
+## Notes
+
+- This README was written by AI.
