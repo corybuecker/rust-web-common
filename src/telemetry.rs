@@ -2,9 +2,9 @@ use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{metrics::SdkMeterProvider, trace::SdkTracerProvider};
 use thiserror::Error;
-use tracing::{info, level_filters::LevelFilter};
+use tracing::{Subscriber, info, level_filters::LevelFilter};
 use tracing_opentelemetry::MetricsLayer;
-use tracing_subscriber::{Layer, Registry, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{Layer, Registry, layer::SubscriberExt};
 
 pub struct TelemetryConfig {
     pub service_name: String,
@@ -23,19 +23,17 @@ pub enum TelemetryError {
     Configuration(String),
     #[error("Provider shutdown failed: {0}")]
     Shutdown(String),
+    #[error("Missing tracer provider")]
+    MissingTracerProvider,
 }
 
 pub struct TelemetryBuilder {
     config: TelemetryConfig,
+    meter_provider: Option<SdkMeterProvider>,
+    tracer_provider: Option<SdkTracerProvider>,
 }
 
-#[derive(Default)]
-pub struct TelemetryProviders {
-    pub meter_provider: Option<SdkMeterProvider>,
-    pub tracer_provider: Option<SdkTracerProvider>,
-}
-
-impl Drop for TelemetryProviders {
+impl Drop for TelemetryBuilder {
     fn drop(&mut self) {
         info!("Shutting down telemetry providers...");
 
@@ -61,6 +59,35 @@ pub struct EnvironmentConfig {
 }
 
 impl TelemetryBuilder {
+    pub fn init_tracing(&self) -> Result<(), TelemetryError> {
+        match &self.tracer_provider {
+            Some(provider) => {
+                opentelemetry::global::set_tracer_provider(provider.to_owned());
+                Ok(())
+            }
+            None => Err(TelemetryError::MissingTracerProvider),
+        }
+    }
+
+    pub fn init_metering(&self) -> Result<(), TelemetryError> {
+        match &self.meter_provider {
+            Some(provider) => {
+                opentelemetry::global::set_meter_provider(provider.to_owned());
+                Ok(())
+            }
+            None => Err(TelemetryError::MissingTracerProvider),
+        }
+    }
+
+    pub fn init_subscriber(&mut self) -> Result<(), TelemetryError> {
+        let subscriber = self.build_registry()?;
+
+        tracing::subscriber::set_global_default(subscriber)
+            .map_err(|_e| TelemetryError::MissingTracerProvider)?;
+
+        Ok(())
+    }
+
     pub fn new(service_name: impl Into<String>) -> Self {
         Self {
             config: TelemetryConfig {
@@ -71,6 +98,8 @@ impl TelemetryBuilder {
                 tracing_endpoint: std::env::var("TRACING_ENDPOINT").ok(),
                 protocol: opentelemetry_otlp::Protocol::HttpBinary,
             },
+            meter_provider: None,
+            tracer_provider: None,
         }
     }
 
@@ -89,37 +118,26 @@ impl TelemetryBuilder {
         self
     }
 
-    pub fn build(self) -> Result<TelemetryProviders, TelemetryError> {
+    fn build_registry(&mut self) -> Result<impl Subscriber + Send + Sync, TelemetryError> {
         let logging_layer = build_logging_layer()?;
         let service_name = self.config.service_name.clone();
         let mut layers: Vec<Box<dyn Layer<Registry> + Send + Sync>> = vec![logging_layer];
-        let mut providers = TelemetryProviders::default();
 
-        match self.config.metrics_endpoint {
-            Some(endpoint) => {
-                let provider = build_meter_provider(endpoint, service_name.clone())?;
-                providers.meter_provider = Some(provider.clone());
-                layers.push(build_metrics_exporter(provider)?);
-            }
-            None => {
-                tracing::warn!("No metrics endpoint configured, metrics will not be exported.");
-            }
+        if let Some(endpoint) = &self.config.metrics_endpoint {
+            let provider = build_meter_provider(endpoint.to_owned(), service_name.clone())?;
+            self.meter_provider = Some(provider.clone());
+            layers.push(build_metrics_exporter(provider)?);
         }
 
-        match self.config.tracing_endpoint {
-            Some(endpoint) => {
-                let provider = build_tracer_provider(endpoint, service_name.clone())?;
-                providers.tracer_provider = Some(provider.clone());
-                layers.push(build_tracing_exporter(provider, service_name.clone())?);
-            }
-            None => {
-                tracing::warn!("No tracer endpoint configured, traces will not be exported.");
-            }
+        if let Some(endpoint) = &self.config.tracing_endpoint {
+            let provider = build_tracer_provider(endpoint.to_owned(), service_name.clone())?;
+            self.tracer_provider = Some(provider.clone());
+            layers.push(build_tracing_exporter(provider, service_name.clone())?);
         }
 
-        tracing_subscriber::registry().with(layers).init();
+        let registry = Registry::default().with(layers);
 
-        Ok(providers)
+        Ok(registry)
     }
 }
 
