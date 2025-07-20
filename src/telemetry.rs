@@ -59,27 +59,7 @@ pub struct EnvironmentConfig {
 }
 
 impl TelemetryBuilder {
-    pub fn init_tracing(&self) -> Result<(), TelemetryError> {
-        match &self.tracer_provider {
-            Some(provider) => {
-                opentelemetry::global::set_tracer_provider(provider.to_owned());
-                Ok(())
-            }
-            None => Err(TelemetryError::MissingTracerProvider),
-        }
-    }
-
-    pub fn init_metering(&self) -> Result<(), TelemetryError> {
-        match &self.meter_provider {
-            Some(provider) => {
-                opentelemetry::global::set_meter_provider(provider.to_owned());
-                Ok(())
-            }
-            None => Err(TelemetryError::MissingTracerProvider),
-        }
-    }
-
-    pub fn init_subscriber(&mut self) -> Result<(), TelemetryError> {
+    pub fn init(&mut self) -> Result<(), TelemetryError> {
         let subscriber = self.build_registry()?;
 
         tracing::subscriber::set_global_default(subscriber)
