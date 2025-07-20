@@ -36,12 +36,6 @@ fn main() {
     telemetry
         .init_subscriber()
         .expect("could not initialize subscriber");
-    telemetry
-        .init_tracing()
-        .expect("could not initialize tracing");
-    telemetry
-        .init_metering()
-        .expect("could not initialize metering");
 
     // Your application logic here
 }
