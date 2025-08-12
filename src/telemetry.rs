@@ -37,17 +37,15 @@ impl Drop for TelemetryBuilder {
     fn drop(&mut self) {
         info!("Shutting down telemetry providers...");
 
-        if let Some(provider) = &self.meter_provider {
-            if let Err(e) = provider.shutdown() {
+        if let Some(provider) = &self.meter_provider
+            && let Err(e) = provider.shutdown() {
                 tracing::error!("Failed to shutdown meter provider: {}", e);
             }
-        }
 
-        if let Some(provider) = &self.tracer_provider {
-            if let Err(e) = provider.shutdown() {
+        if let Some(provider) = &self.tracer_provider
+            && let Err(e) = provider.shutdown() {
                 tracing::error!("Failed to shutdown tracer provider: {}", e);
             }
-        }
     }
 }
 
