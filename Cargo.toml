@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-opentelemetry = { version = "0.30.0" }
+opentelemetry = { version = "0.31.0" }
 opentelemetry-otlp = { version = "0.30.0" }
 opentelemetry_sdk = { version = "0.30.0" }
 thiserror = { version = "2.0.16" }
