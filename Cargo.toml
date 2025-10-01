@@ -9,5 +9,5 @@ opentelemetry-otlp = { version = "0.31.0" }
 opentelemetry_sdk = { version = "0.31.0" }
 thiserror = { version = "2.0.17" }
 tracing = { version = "0.1.41" }
-tracing-opentelemetry = { git = "https://github.com/tokio-rs/tracing-opentelemetry.git", rev = "8905ee70df3c9f427ee026b24271c4adfcd1d8b1" }
+tracing-opentelemetry = { version = "0.32.0" }
 tracing-subscriber = "0.3"
