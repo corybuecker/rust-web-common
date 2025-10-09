@@ -5,7 +5,6 @@ use handlebars::{self, DirectorySourceOptions};
 use serde_json::Value;
 use std::{collections::BTreeMap, sync::Mutex, time::SystemTime};
 use thiserror::Error;
-use tracing::debug;
 
 pub use handlebars::to_json;
 
@@ -67,10 +66,8 @@ impl Renderer {
     }
 
     pub fn render(&self, template_name: &str) -> Result<String, RendererError> {
-        let result = self.handlebars.render(template_name, &self.context);
-
-        debug!("{:?}", result);
-
-        result.map_err(RendererError::RenderError)
+        self.handlebars
+            .render(template_name, &self.context)
+            .map_err(RendererError::RenderError)
     }
 }
