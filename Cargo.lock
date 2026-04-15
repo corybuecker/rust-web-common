@@ -943,7 +943,7 @@ dependencies = [
 
 [[package]]
 name = "rust-web-common"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "handlebars",
  "opentelemetry",
