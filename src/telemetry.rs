@@ -12,13 +12,10 @@ enum LogOutputFormat {
     Plain,
 }
 
-pub struct TelemetryConfig {
-    pub service_name: String,
-    pub service_version: Option<String>,
-    pub log_level: tracing::Level,
-    pub metrics_endpoint: Option<String>,
-    pub tracing_endpoint: Option<String>,
-    pub protocol: opentelemetry_otlp::Protocol,
+struct TelemetryConfig {
+    service_name: String,
+    metrics_endpoint: Option<String>,
+    tracing_endpoint: Option<String>,
     log_output_format: LogOutputFormat,
 }
 
@@ -79,21 +76,13 @@ impl TelemetryBuilder {
         Self {
             config: TelemetryConfig {
                 service_name: service_name.into(),
-                service_version: None,
-                log_level: tracing::Level::INFO,
                 metrics_endpoint: std::env::var("METRICS_ENDPOINT").ok(),
                 tracing_endpoint: std::env::var("TRACING_ENDPOINT").ok(),
-                protocol: opentelemetry_otlp::Protocol::HttpBinary,
                 log_output_format: LogOutputFormat::Plain,
             },
             meter_provider: None,
             tracer_provider: None,
         }
-    }
-
-    pub fn with_log_level(mut self, level: tracing::Level) -> Self {
-        self.config.log_level = level;
-        self
     }
 
     pub fn with_json_log_format(mut self) -> Self {
