@@ -8,6 +8,7 @@ use tracing_subscriber::{Layer, Registry, layer::SubscriberExt};
 
 enum LogOutputFormat {
     Json,
+    #[allow(dead_code)]
     Pretty,
     Plain,
 }
