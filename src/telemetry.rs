@@ -8,7 +8,6 @@ use tracing_subscriber::{Layer, Registry, layer::SubscriberExt};
 
 enum LogOutputFormat {
     Json,
-    #[allow(dead_code)]
     Pretty,
     Plain,
 }
@@ -99,6 +98,11 @@ impl TelemetryBuilder {
 
     pub fn with_json_log_format(mut self) -> Self {
         self.config.log_output_format = LogOutputFormat::Json;
+        self
+    }
+
+    pub fn with_pretty_log_format(mut self) -> Self {
+        self.config.log_output_format = LogOutputFormat::Pretty;
         self
     }
 
