@@ -9,6 +9,7 @@ use tracing_subscriber::{Layer, Registry, layer::SubscriberExt};
 enum LogOutputFormat {
     Json,
     Pretty,
+    Plain,
 }
 
 pub struct TelemetryConfig {
@@ -83,7 +84,7 @@ impl TelemetryBuilder {
                 metrics_endpoint: std::env::var("METRICS_ENDPOINT").ok(),
                 tracing_endpoint: std::env::var("TRACING_ENDPOINT").ok(),
                 protocol: opentelemetry_otlp::Protocol::HttpBinary,
-                log_output_format: LogOutputFormat::Pretty,
+                log_output_format: LogOutputFormat::Plain,
             },
             meter_provider: None,
             tracer_provider: None,
@@ -147,6 +148,7 @@ fn build_logging_layer(
     let layer: Box<dyn Layer<Registry> + Send + Sync> = match log_output_format {
         LogOutputFormat::Json => layer.json().with_level(true).with_filter(target).boxed(),
         LogOutputFormat::Pretty => layer.pretty().with_level(true).with_filter(target).boxed(),
+        LogOutputFormat::Plain => layer.with_level(true).with_filter(target).boxed(),
     };
 
     Ok(layer)
