@@ -6,13 +6,17 @@ use tracing::{Subscriber, info, level_filters::LevelFilter};
 use tracing_opentelemetry::MetricsLayer;
 use tracing_subscriber::{Layer, Registry, layer::SubscriberExt};
 
-pub struct TelemetryConfig {
-    pub service_name: String,
-    pub service_version: Option<String>,
-    pub log_level: tracing::Level,
-    pub metrics_endpoint: Option<String>,
-    pub tracing_endpoint: Option<String>,
-    pub protocol: opentelemetry_otlp::Protocol,
+enum LogOutputFormat {
+    Json,
+    Pretty,
+    Plain,
+}
+
+struct TelemetryConfig {
+    service_name: String,
+    metrics_endpoint: Option<String>,
+    tracing_endpoint: Option<String>,
+    log_output_format: LogOutputFormat,
 }
 
 #[derive(Error, Debug)]
@@ -38,14 +42,16 @@ impl Drop for TelemetryBuilder {
         info!("Shutting down telemetry providers...");
 
         if let Some(provider) = &self.meter_provider
-            && let Err(e) = provider.shutdown() {
-                tracing::error!("Failed to shutdown meter provider: {}", e);
-            }
+            && let Err(e) = provider.shutdown()
+        {
+            tracing::error!("Failed to shutdown meter provider: {}", e);
+        }
 
         if let Some(provider) = &self.tracer_provider
-            && let Err(e) = provider.shutdown() {
-                tracing::error!("Failed to shutdown tracer provider: {}", e);
-            }
+            && let Err(e) = provider.shutdown()
+        {
+            tracing::error!("Failed to shutdown tracer provider: {}", e);
+        }
     }
 }
 
@@ -70,19 +76,22 @@ impl TelemetryBuilder {
         Self {
             config: TelemetryConfig {
                 service_name: service_name.into(),
-                service_version: None,
-                log_level: tracing::Level::INFO,
                 metrics_endpoint: std::env::var("METRICS_ENDPOINT").ok(),
                 tracing_endpoint: std::env::var("TRACING_ENDPOINT").ok(),
-                protocol: opentelemetry_otlp::Protocol::HttpBinary,
+                log_output_format: LogOutputFormat::Plain,
             },
             meter_provider: None,
             tracer_provider: None,
         }
     }
 
-    pub fn with_log_level(mut self, level: tracing::Level) -> Self {
-        self.config.log_level = level;
+    pub fn with_json_log_format(mut self) -> Self {
+        self.config.log_output_format = LogOutputFormat::Json;
+        self
+    }
+
+    pub fn with_pretty_log_format(mut self) -> Self {
+        self.config.log_output_format = LogOutputFormat::Pretty;
         self
     }
 
@@ -97,7 +106,7 @@ impl TelemetryBuilder {
     }
 
     fn build_registry(&mut self) -> Result<impl Subscriber + Send + Sync, TelemetryError> {
-        let logging_layer = build_logging_layer()?;
+        let logging_layer = build_logging_layer(&self.config.log_output_format)?;
         let service_name = self.config.service_name.clone();
         let mut layers: Vec<Box<dyn Layer<Registry> + Send + Sync>> = vec![logging_layer];
 
@@ -119,7 +128,9 @@ impl TelemetryBuilder {
     }
 }
 
-fn build_logging_layer() -> Result<Box<dyn Layer<Registry> + Send + Sync>, TelemetryError> {
+fn build_logging_layer(
+    log_output_format: &LogOutputFormat,
+) -> Result<Box<dyn Layer<Registry> + Send + Sync>, TelemetryError> {
     let env_log_level = std::env::var("LOG_LEVEL")
         .unwrap_or("info".to_string())
         .parse()
@@ -127,11 +138,14 @@ fn build_logging_layer() -> Result<Box<dyn Layer<Registry> + Send + Sync>, Telem
         .unwrap_or(LevelFilter::INFO);
 
     let target = tracing_subscriber::filter::Targets::new().with_default(env_log_level);
+    let layer: tracing_subscriber::fmt::Layer<Registry> = tracing_subscriber::fmt::layer();
+    let layer: Box<dyn Layer<Registry> + Send + Sync> = match log_output_format {
+        LogOutputFormat::Json => layer.json().with_level(true).with_filter(target).boxed(),
+        LogOutputFormat::Pretty => layer.pretty().with_level(true).with_filter(target).boxed(),
+        LogOutputFormat::Plain => layer.with_level(true).with_filter(target).boxed(),
+    };
 
-    Ok(tracing_subscriber::fmt::layer()
-        .with_level(true)
-        .with_filter(target)
-        .boxed())
+    Ok(layer)
 }
 
 fn build_meter_provider(
