@@ -6,7 +6,7 @@ use tracing::{Subscriber, info, level_filters::LevelFilter};
 use tracing_opentelemetry::MetricsLayer;
 use tracing_subscriber::{Layer, Registry, layer::SubscriberExt};
 
-pub enum LogOutputFormat {
+enum LogOutputFormat {
     Json,
     Pretty,
 }
@@ -18,7 +18,7 @@ pub struct TelemetryConfig {
     pub metrics_endpoint: Option<String>,
     pub tracing_endpoint: Option<String>,
     pub protocol: opentelemetry_otlp::Protocol,
-    pub log_output_format: LogOutputFormat,
+    log_output_format: LogOutputFormat,
 }
 
 #[derive(Error, Debug)]
@@ -95,6 +95,11 @@ impl TelemetryBuilder {
         self
     }
 
+    pub fn with_json_log_format(mut self) -> Self {
+        self.config.log_output_format = LogOutputFormat::Json;
+        self
+    }
+
     pub fn with_metrics_endpoint(mut self, endpoint: impl Into<String>) -> Self {
         self.config.metrics_endpoint = Some(endpoint.into());
         self
@@ -141,11 +146,7 @@ fn build_logging_layer(
     let layer: tracing_subscriber::fmt::Layer<Registry> = tracing_subscriber::fmt::layer();
     let layer: Box<dyn Layer<Registry> + Send + Sync> = match log_output_format {
         LogOutputFormat::Json => layer.json().with_level(true).with_filter(target).boxed(),
-        LogOutputFormat::Pretty => layer
-            .pretty()
-            .with_level(true)
-            .with_filter(target)
-            .boxed(),
+        LogOutputFormat::Pretty => layer.pretty().with_level(true).with_filter(target).boxed(),
     };
 
     Ok(layer)
