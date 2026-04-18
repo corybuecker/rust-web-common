@@ -34,6 +34,8 @@ The following environment variables are used to configure telemetry at runtime:
 
 #### Telemetry Usage
 
+Logging defaults to plain text output. If you need structured logs for aggregation systems, enable JSON output with `with_json_log_format()`.
+
 ```rust
 use rust_web_common::telemetry::TelemetryBuilder;
 
@@ -45,6 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Or configure explicitly
     let mut telemetry = TelemetryBuilder::new("my-service")
         .with_log_level(tracing::Level::DEBUG)
+        .with_json_log_format()
         .with_metrics_endpoint("http://localhost:4318/v1/metrics")
         .with_tracing_endpoint("http://localhost:4318/v1/traces");
 
