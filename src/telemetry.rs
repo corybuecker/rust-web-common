@@ -141,7 +141,7 @@ fn build_logging_layer(
     let layer: tracing_subscriber::fmt::Layer<Registry> = tracing_subscriber::fmt::layer();
     let layer: Box<dyn Layer<Registry> + Send + Sync> = match log_output_format {
         LogOutputFormat::Json => layer.json().with_level(true).with_filter(target).boxed(),
-        LogOutputFormat::Plain => layer
+        LogOutputFormat::Pretty => layer
             .pretty()
             .with_level(true)
             .with_filter(target)
