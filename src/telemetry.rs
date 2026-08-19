@@ -2,7 +2,7 @@ use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{metrics::SdkMeterProvider, trace::SdkTracerProvider};
 use thiserror::Error;
-use tracing::{Subscriber, info, level_filters::LevelFilter};
+use tracing::{Level, Subscriber, info, level_filters::LevelFilter};
 use tracing_opentelemetry::MetricsLayer;
 use tracing_subscriber::{Layer, Registry, layer::SubscriberExt};
 
@@ -17,6 +17,7 @@ struct TelemetryConfig {
     metrics_endpoint: Option<String>,
     tracing_endpoint: Option<String>,
     log_output_format: LogOutputFormat,
+    targets: Vec<(String, Level)>,
 }
 
 #[derive(Error, Debug)]
@@ -55,13 +56,6 @@ impl Drop for TelemetryBuilder {
     }
 }
 
-#[derive(Clone)]
-pub struct EnvironmentConfig {
-    pub metrics_endpoint: Option<String>,
-    pub tracing_endpoint: Option<String>,
-    pub log_level: tracing::Level,
-}
-
 impl TelemetryBuilder {
     pub fn init(&mut self) -> Result<(), TelemetryError> {
         let subscriber = self.build_registry()?;
@@ -79,6 +73,7 @@ impl TelemetryBuilder {
                 metrics_endpoint: std::env::var("METRICS_ENDPOINT").ok(),
                 tracing_endpoint: std::env::var("TRACING_ENDPOINT").ok(),
                 log_output_format: LogOutputFormat::Plain,
+                targets: vec![],
             },
             meter_provider: None,
             tracer_provider: None,
@@ -87,6 +82,11 @@ impl TelemetryBuilder {
 
     pub fn with_json_log_format(mut self) -> Self {
         self.config.log_output_format = LogOutputFormat::Json;
+        self
+    }
+
+    pub fn with_targets(mut self, targets: Vec<(String, Level)>) -> Self {
+        self.config.targets = targets;
         self
     }
 
@@ -106,7 +106,8 @@ impl TelemetryBuilder {
     }
 
     fn build_registry(&mut self) -> Result<impl Subscriber + Send + Sync, TelemetryError> {
-        let logging_layer = build_logging_layer(&self.config.log_output_format)?;
+        let logging_layer =
+            build_logging_layer(&self.config.log_output_format, self.config.targets.clone())?;
         let service_name = self.config.service_name.clone();
         let mut layers: Vec<Box<dyn Layer<Registry> + Send + Sync>> = vec![logging_layer];
 
@@ -130,6 +131,7 @@ impl TelemetryBuilder {
 
 fn build_logging_layer(
     log_output_format: &LogOutputFormat,
+    targets: Vec<(String, Level)>,
 ) -> Result<Box<dyn Layer<Registry> + Send + Sync>, TelemetryError> {
     let env_log_level = std::env::var("LOG_LEVEL")
         .unwrap_or("info".to_string())
@@ -137,7 +139,9 @@ fn build_logging_layer(
         .ok()
         .unwrap_or(LevelFilter::INFO);
 
-    let target = tracing_subscriber::filter::Targets::new().with_default(env_log_level);
+    let target = tracing_subscriber::filter::Targets::new()
+        .with_default(env_log_level)
+        .with_targets(targets);
     let layer: tracing_subscriber::fmt::Layer<Registry> = tracing_subscriber::fmt::layer();
     let layer: Box<dyn Layer<Registry> + Send + Sync> = match log_output_format {
         LogOutputFormat::Json => layer.json().with_level(true).with_filter(target).boxed(),
